@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 480" fill="none">
+  <rect width="320" height="480" fill="#e2e8f0"/>
+  <path d="M112 160h96v128h-96z" stroke="#94a3b8" stroke-width="10"/>
+  <path d="m128 260 24-28 20 20 16-18 16 26" stroke="#94a3b8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="145" cy="190" r="10" fill="#94a3b8"/>
+  <text x="160" y="330" fill="#64748b" font-family="sans-serif" font-size="18" text-anchor="middle">포스터 없음</text>
+</svg>
