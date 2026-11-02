@@ -15,13 +15,12 @@ export default function Header() {
           UMC Movie
         </Link>
 
-        <Link
-          to="/search"
-          aria-label="영화 검색"
-          className="flex size-9 items-center justify-center rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-        >
-          <img src="/icons/search.svg" alt="" className="size-4 brightness-0 invert" />
-        </Link>
+        <nav className="flex items-center gap-3">
+          <Link to="/search" aria-label="영화 검색" className="flex size-9 items-center justify-center rounded-md border border-slate-200 bg-white transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            <img src="/icons/search.svg" alt="" className="size-4" />
+          </Link>
+          <button type="button" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">로그인</button>
+        </nav>
       </div>
     </header>
   );
