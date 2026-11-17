@@ -1,18 +1,15 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { isHTTPError } from "ky";
-import { getMyInfo, updateMyInfo } from "../../api/members/my-info";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { getMe } from "../../api/members/me";
+import { useUpdateMeMutation } from "../../hooks/use-update-me-mutation";
 import { checkNicknameDuplicate } from "../../api/members/check-nickname-duplicate";
 import { ProfileAvatar } from "../../components/members/profile-avatar";
-import { useAuthStore } from "../../utils/auth-storage";
 import { useProfileStore } from "../../utils/profile-storage";
 
 export function EditMyPage() {
-  const accessToken = useAuthStore((state) => state.accessToken);
   const image = useProfileStore((state) => state.image);
   const updateProfile = useProfileStore((state) => state.updateProfile);
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const fileInput = useRef<HTMLInputElement>(null);
   const [nickname, setNickname] = useState("");
@@ -20,8 +17,8 @@ export function EditMyPage() {
   const [checkedNickname, setCheckedNickname] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [message, setMessage] = useState("");
-  const memberQuery = useQuery({ queryKey: ["members", "me", accessToken], queryFn: getMyInfo, enabled: !!accessToken });
-  const mutation = useMutation({ mutationFn: updateMyInfo });
+  const memberQuery = useQuery({ queryKey: ["members", "me"], queryFn: getMe });
+  const mutation = useUpdateMeMutation();
 
   useEffect(() => {
     if (memberQuery.data) setNickname(memberQuery.data.nickname);
@@ -70,20 +67,20 @@ export function EditMyPage() {
     const value = nickname.trim();
     if (value.length < 2 || value.length > 12) return setMessage("닉네임은 2자 이상 12자 이하로 입력해 주세요.");
     if (value !== memberQuery.data?.nickname && checkedNickname !== value) return setMessage("닉네임 중복 확인을 해 주세요.");
+    if (mutation.isPending) return;
     try {
-      const updated = value === memberQuery.data?.nickname ? memberQuery.data : await mutation.mutateAsync(value);
-      if (!updated) return;
-      queryClient.setQueryData(["members", "me", accessToken], updated);
+      // 닉네임이 바뀌었을 때만 요청한다. 성공하면 훅의 onSuccess가 ["members", "me"] 캐시를 직접 갱신한다.
+      const updated =
+        value === memberQuery.data?.nickname
+          ? memberQuery.data
+          : (await mutation.mutateAsync({ nickname: value })).result;
       updateProfile({ nickname: updated.nickname, email: updated.email, image: previewImage });
       await navigate({ to: "/mypage" });
-    } catch (error) {
-      setMessage(isHTTPError(error) && error.response.status === 409
-        ? "이미 사용 중인 닉네임입니다."
-        : "정보를 저장하지 못했습니다. 다시 시도해 주세요.");
+    } catch {
+      // 실패 안내는 훅의 onError에서 처리한다.
     }
   };
 
-  if (!accessToken) return <main className="min-h-[calc(100vh-4rem)] bg-[#f5f6f8] p-8 text-center">로그인이 필요합니다. <Link to="/login" className="text-blue-600">로그인하기</Link></main>;
   if (memberQuery.isPending) return <main className="min-h-[calc(100vh-4rem)] bg-[#f5f6f8] p-8 text-center">회원 정보를 불러오는 중...</main>;
   if (memberQuery.isError) return <main className="min-h-[calc(100vh-4rem)] bg-[#f5f6f8] p-8 text-center" role="alert">회원 정보를 불러오지 못했습니다. 다시 로그인해 주세요.</main>;
 

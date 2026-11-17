@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from "@tanstack/react-router"
 import { checkEmailDuplicate } from "../../api/members/check-email-duplicate"
 import { checkNicknameDuplicate } from "../../api/members/check-nickname-duplicate"
-import { signup } from "../../api/members/signup";
-// import { useNavigate } from "@tanstack/react-router";
+import { useSignupMutation } from "../../hooks/use-signup-mutation"
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])[A-Za-z0-9!@#$%^&*]{8,}$/
@@ -25,7 +25,7 @@ export function SignupPage() {
     nickname: DEFAULT_DUPLICATE_CHECK,
   })
 
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const signupMutation = useSignupMutation()
 
   // 유효성 검사
   const isEmailValid = EMAIL_REGEX.test(form.email.trim())
@@ -34,7 +34,7 @@ export function SignupPage() {
   const isPasswordConfirmValid = form.passwordConfirm.length > 0 && form.password === form.passwordConfirm
 
   const isFormValid = isEmailValid && isNicknameValid && isPasswordValid && isPasswordConfirmValid
-  const canSubmit = isFormValid && !isSubmitting &&
+  const canSubmit = isFormValid && !signupMutation.isPending &&
     !duplicateCheck.email.isChecking && !duplicateCheck.nickname.isChecking &&
     !(duplicateCheck.email.isChecked && !duplicateCheck.email.isAvailable) &&
     !(duplicateCheck.nickname.isChecked && !duplicateCheck.nickname.isAvailable)
@@ -85,26 +85,24 @@ export function SignupPage() {
     }
   }
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-  e.preventDefault();
-  if (!canSubmit || isSubmitting) return;
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
 
-  setIsSubmitting(true);
-  try {
-    await signup({
-      email: form.email.trim(),
-      nickname: form.nickname.trim(),
-      password: form.password,
-    });
-    setSubmitted(true);
-    // 로그인 페이지 연결 후 주석 해제
-    // navigate({ to: "/login" });
-  } catch {
-    alert("회원가입에 실패했어요. 다시 시도해 주세요.");
-  } finally {
-    setIsSubmitting(false);
+    if (!canSubmit || signupMutation.isPending) return
+
+    signupMutation.mutate(
+      {
+        email: form.email.trim(),
+        nickname: form.nickname.trim(),
+        password: form.password,
+      },
+      {
+        onSuccess: () => {
+          setSubmitted(true)
+        },
+      }
+    )
   }
-};
 
   const inputClass = 'h-[51px] w-full rounded-[9px] border border-[#dce1e9] bg-white px-4 text-sm text-[#20242b] outline-none placeholder:text-[#929bab] focus:border-[#2862ed] focus:ring-2 focus:ring-[#2862ed]/10'
   const labelClass = 'mb-[7px] block text-[13px] font-bold leading-5 text-[#20242b]'
@@ -135,8 +133,8 @@ export function SignupPage() {
                   type="button"
                   disabled={!isEmailValid || duplicateCheck.email.isChecking}
                   onClick={() => handleCheckDuplicate("email")}
-                  >
-                    {duplicateCheck.email.isChecking ? "확인 중" : "중복 확인"}
+                >
+                  {duplicateCheck.email.isChecking ? "확인 중" : "중복 확인"}
                 </button>
               </div>
               {form.email.length > 0 && !isEmailValid && (
@@ -213,13 +211,13 @@ export function SignupPage() {
             {/* 제출 버튼 */}
             <button
               type="submit"
-              disabled={!canSubmit || isSubmitting}
+              disabled={!canSubmit || signupMutation.isPending}
               className="h-[49px] w-full rounded-[8px] bg-[#2862ed] text-sm font-bold text-white transition-colors hover:bg-[#1e55d8] disabled:cursor-not-allowed disabled:bg-[#a4adbd] disabled:opacity-100"
             >
-              {isSubmitting ? "가입 중" : "가입하기"}
+              {signupMutation.isPending ? "가입 중" : "가입하기"}
             </button>
             <p className="pt-[2px] text-center text-[13px] text-[#737d8d]">
-              이미 계정이 있나요? <a className="font-bold text-[#2862ed] hover:underline" href="/login">로그인</a>
+              이미 계정이 있나요? <Link className="font-bold text-[#2862ed] hover:underline" to="/login">로그인</Link>
             </p>
           </form>
         )}
