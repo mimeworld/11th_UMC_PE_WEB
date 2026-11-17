@@ -1,9 +1,14 @@
 import { Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { isHTTPError } from "ky";
 import { getMovieDetail } from "../../api/movies/get-movie-detail";
 import { BookmarkDetailButton } from "../../components/movies/bookmark-detail-button";
+import { useCreateRatingMutation } from "../../hooks/use-create-rating-mutation";
+import { useDeleteRatingMutation } from "../../hooks/use-delete-rating-mutation";
+import { useMemberRatingsQuery } from "../../hooks/use-member-ratings-query";
+import { useRequireLogin } from "../../hooks/use-require-login";
+import { useUpdateRatingMutation } from "../../hooks/use-update-rating-mutation";
 import { getTmdbBackdropUrl, getTmdbPosterUrl } from "../../utils/tmdb-image";
 
 export function MovieDetailPage() {
@@ -18,21 +23,52 @@ export function MovieDetailPage() {
     staleTime: 30 * 1000,
   });
 
-  const [rating, setRating] = useState(() =>
-    Number(localStorage.getItem(`umcine-rating-${movieIdParam}`) ?? 0)
-  );
-  const [review, setReview] = useState(
-    () => localStorage.getItem(`umcine-review-${movieIdParam}`) ?? ""
-  );
-  const [saved, setSaved] = useState(false);
+  const requireLogin = useRequireLogin();
+  const ratingsQuery = useMemberRatingsQuery();
+  const createRating = useCreateRatingMutation();
+  const updateRating = useUpdateRatingMutation();
+  const deleteRating = useDeleteRatingMutation();
+  const myRating = ratingsQuery.data?.find((item) => item.movieId === movieId);
 
-  useEffect(() => {
-    setRating(
-      Number(localStorage.getItem(`umcine-rating-${movieIdParam}`) ?? 0)
-    );
-    setReview(localStorage.getItem(`umcine-review-${movieIdParam}`) ?? "");
-    setSaved(false);
-  }, [movieIdParam]);
+  // 사용자가 입력 중인 값. 없으면 서버에 저장된 내 평점을 보여준다.
+  const [draft, setDraft] = useState<{ movieId: number; rating: number; review: string } | null>(null);
+  const [savedMovieId, setSavedMovieId] = useState<number | null>(null);
+  const currentDraft = draft?.movieId === movieId ? draft : null;
+  const rating = currentDraft?.rating ?? myRating?.score ?? 0;
+  const review = currentDraft?.review ?? myRating?.comment ?? "";
+  const saved = savedMovieId === movieId;
+  const isSaving = createRating.isPending || updateRating.isPending;
+
+  const changeDraft = (patch: { rating?: number; review?: string }) => {
+    setDraft({ movieId, rating, review, ...patch });
+    setSavedMovieId(null);
+  };
+
+  const handleSaveRating = () => {
+    if (!requireLogin()) return;
+    if (rating === 0 || isSaving) return;
+
+    const body = { score: rating, comment: review.trim() || null };
+    const onSuccess = () => {
+      setDraft(null);
+      setSavedMovieId(movieId);
+    };
+
+    if (myRating) updateRating.mutate({ ratingId: myRating.ratingId, ...body }, { onSuccess });
+    else createRating.mutate({ movieId, ...body }, { onSuccess });
+  };
+
+  const handleDeleteRating = () => {
+    if (!myRating || deleteRating.isPending) return;
+    if (!window.confirm("평점을 삭제할까요?")) return;
+
+    deleteRating.mutate(myRating.ratingId, {
+      onSuccess: () => {
+        setDraft(null);
+        setSavedMovieId(null);
+      },
+    });
+  };
 
   const movie = movieDetailQuery.data;
 
@@ -143,10 +179,7 @@ export function MovieDetailPage() {
                 type="button"
                 aria-label={`${value}점`}
                 aria-pressed={rating === value}
-                onClick={() => {
-                  setRating(value);
-                  setSaved(false);
-                }}
+                onClick={() => changeDraft({ rating: value })}
                 className={`rounded-lg border border-slate-200 bg-white px-2 py-1 text-2xl ${
                   value <= rating ? "text-amber-400" : "text-slate-400"
                 }`}
@@ -159,27 +192,28 @@ export function MovieDetailPage() {
             aria-label="영화 감상"
             placeholder="영화를 보고 느낀 점을 남겨보세요."
             value={review}
-            onChange={(event) => {
-              setReview(event.target.value);
-              setSaved(false);
-            }}
+            maxLength={500}
+            onChange={(event) => changeDraft({ review: event.target.value })}
             className="mt-3 h-28 w-full resize-y rounded-lg border border-slate-200 bg-white p-3 text-sm outline-blue-500"
           />
           <button
             type="button"
-            disabled={rating === 0}
-            onClick={() => {
-              localStorage.setItem(
-                `umcine-rating-${movieIdParam}`,
-                String(rating)
-              );
-              localStorage.setItem(`umcine-review-${movieIdParam}`, review);
-              setSaved(true);
-            }}
+            disabled={rating === 0 || isSaving}
+            onClick={handleSaveRating}
             className="mt-2 w-full rounded-lg bg-slate-900 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            평점 저장
+            {isSaving ? "저장 중..." : myRating ? "평점 수정" : "평점 저장"}
           </button>
+          {myRating && (
+            <button
+              type="button"
+              disabled={deleteRating.isPending}
+              onClick={handleDeleteRating}
+              className="mt-2 w-full rounded-lg border border-red-300 bg-white py-3 text-sm font-bold text-red-500 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {deleteRating.isPending ? "삭제 중..." : "평점 삭제"}
+            </button>
+          )}
           {saved && (
             <p role="status" className="mt-2 text-sm text-blue-600">
               평점이 저장되었어요.

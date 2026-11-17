@@ -1,21 +1,21 @@
-import { useBookmarkStore } from "../../utils/bookmark-storage";
+import { useFavoriteStatusQuery } from "../../hooks/use-favorite-status-query";
+import { useFavoriteToggle } from "../../hooks/use-favorite-toggle";
 
 interface BookmarkButtonProps {
   movieId: number;
 }
 
 export function BookmarkDetailButton({ movieId }: BookmarkButtonProps) {
-  const isBookmarked = useBookmarkStore((state) =>
-    state.bookmarkedMovieIds.includes(movieId),
-  );
-  const toggleBookmark = useBookmarkStore(
-    (state) => state.toggleBookmark,
-  );
+  const statusQuery = useFavoriteStatusQuery(movieId);
+  const isBookmarked = statusQuery.data?.isFavorite ?? false;
+  const { toggle, isPending } = useFavoriteToggle(movieId, isBookmarked);
 
   return (
     <button
       type="button"
-      onClick={() => toggleBookmark(movieId)}
+      onClick={toggle}
+      disabled={isPending}
+      aria-pressed={isBookmarked}
       /* size-8 대신 px-3 py-1.5 및 gap-1.5 추가 */
       className={`flex items-center gap-3 rounded-md px-5 py-3 text-m font-medium text-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
         isBookmarked

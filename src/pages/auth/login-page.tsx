@@ -1,37 +1,23 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "@tanstack/react-router";
-import { useNavigate } from "@tanstack/react-router";
-import { isHTTPError } from "ky";
-import { login } from "../../api/auth/login";
-import { useAuthStore } from "../../utils/auth-storage";
-import { useProfileStore } from "../../utils/profile-storage";
+import { useLoginMutation } from "../../hooks/use-login-mutation";
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const navigate = useNavigate();
-  const setAccessToken = useAuthStore((state) => state.setAccessToken);
-  const updateProfile = useProfileStore((state) => state.updateProfile);
+  const loginMutation = useLoginMutation();
+  const canSubmit = EMAIL_REGEX.test(email.trim()) && password.length > 0;
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    setError("");
-    try {
-      const { accessToken } = await login(email.trim(), password);
-      updateProfile({ nickname: "", email: "", image: null });
-      setAccessToken(accessToken);
-      await navigate({ to: "/mypage" });
-    } catch (cause) {
-      setError(isHTTPError(cause) && cause.response.status === 401
-        ? "이메일 또는 비밀번호가 올바르지 않습니다."
-        : "로그인에 실패했습니다. 잠시 후 다시 시도해 주세요.");
-    } finally {
-      setIsSubmitting(false);
-    }
+    if (!canSubmit || loginMutation.isPending) return;
+
+    loginMutation.mutate({
+      email: email.trim(),
+      password,
+    });
   };
 
   return (
@@ -86,9 +72,8 @@ export function LoginPage() {
             </div>
           </div>
 
-          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-          <button type="submit" disabled={isSubmitting} className="h-[49px] w-full rounded-[8px] bg-[#2862ed] text-sm font-bold text-white transition-colors hover:bg-[#1e55d8] focus:outline-none focus:ring-2 focus:ring-[#2862ed] focus:ring-offset-2 disabled:opacity-60">
-            로그인
+          <button type="submit" disabled={!canSubmit || loginMutation.isPending} className="h-[49px] w-full rounded-[8px] bg-[#2862ed] text-sm font-bold text-white transition-colors hover:bg-[#1e55d8] focus:outline-none focus:ring-2 focus:ring-[#2862ed] focus:ring-offset-2 disabled:opacity-60">
+            {loginMutation.isPending ? "로그인 중" : "로그인"}
           </button>
 
           <p className="pt-[2px] text-center text-[13px] text-[#737d8d]">

@@ -3,19 +3,18 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { getMovieDetail } from "../../api/movies/get-movie-detail";
 import { ProfileAvatar } from "../../components/members/profile-avatar";
-import { useBookmarkStore } from "../../utils/bookmark-storage";
+import { useFavoritesQuery } from "../../hooks/use-favorites-query";
 import { getTmdbPosterUrl } from "../../utils/tmdb-image";
 import { useProfileStore } from "../../utils/profile-storage";
-import { getMyInfo } from "../../api/members/my-info";
-import { useAuthStore } from "../../utils/auth-storage";
+import { getMe } from "../../api/members/me";
 
 const PAGE_SIZE = 3;
 
 export function MyPage() {
   const { image } = useProfileStore();
-  const accessToken = useAuthStore((state) => state.accessToken);
-  const memberQuery = useQuery({ queryKey: ["members", "me", accessToken], queryFn: getMyInfo, enabled: !!accessToken });
-  const bookmarkedMovieIds = useBookmarkStore((state) => state.bookmarkedMovieIds);
+  const memberQuery = useQuery({ queryKey: ["members", "me"], queryFn: getMe });
+  const favoritesQuery = useFavoritesQuery();
+  const bookmarkedMovieIds = favoritesQuery.data?.map((favorite) => favorite.movieId) ?? [];
   const [page, setPage] = useState(1);
   const totalPages = Math.ceil(bookmarkedMovieIds.length / PAGE_SIZE);
   const currentPage = Math.min(page, Math.max(totalPages, 1));
@@ -28,7 +27,6 @@ export function MyPage() {
     })),
   });
 
-  if (!accessToken) return <main className="min-h-[calc(100vh-4rem)] bg-[#f5f6f8] p-8 text-center"><p>내 정보를 보려면 로그인이 필요합니다.</p><Link to="/login" className="mt-3 inline-block text-blue-600">로그인하기</Link></main>;
   if (memberQuery.isPending) return <main className="min-h-[calc(100vh-4rem)] bg-[#f5f6f8] p-8 text-center">회원 정보를 불러오는 중...</main>;
   if (memberQuery.isError) return <main className="min-h-[calc(100vh-4rem)] bg-[#f5f6f8] p-8 text-center" role="alert">회원 정보를 불러오지 못했습니다. 다시 로그인해 주세요.</main>;
   const { nickname, email } = memberQuery.data;
@@ -60,7 +58,11 @@ export function MyPage() {
 
         <section className="py-6" aria-labelledby="favorites-heading">
           <h2 id="favorites-heading" className="mb-5 text-sm font-bold text-[#20242b]">내 즐겨찾기</h2>
-          {bookmarkedMovieIds.length === 0 ? (
+          {favoritesQuery.isPending ? (
+            <p className="py-10 text-sm text-[#737d8d]">즐겨찾기를 불러오는 중...</p>
+          ) : favoritesQuery.isError ? (
+            <p role="alert" className="py-10 text-sm text-[#737d8d]">즐겨찾기를 불러오지 못했습니다.</p>
+          ) : bookmarkedMovieIds.length === 0 ? (
             <p className="py-10 text-sm text-[#737d8d]">즐겨찾기한 영화가 없습니다.</p>
           ) : (
             <>
