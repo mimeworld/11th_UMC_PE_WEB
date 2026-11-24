@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { useFavoriteToggle } from "../../hooks/use-favorite-toggle";
 import { useFavoritesQuery } from "../../hooks/use-favorites-query";
 
@@ -18,9 +19,11 @@ export function BookmarkButton({ movieId }: BookmarkButtonProps) {
       : "bg-black/60 hover:bg-black/80" // 일반 상태 (검은색 반투명)
     }`}
 >
-    <img
+    <Image
         src={isBookmarked ? "/icons/bookmark.svg" : "/icons/bookmark-outline.svg"}
         alt=""
+        width={16}
+        height={16}
         className="size-4 pointer-events-none"
       />
     </button>

@@ -1,0 +1,162 @@
+"use client";
+
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { useState, type FormEvent } from "react";
+import { searchMovies } from "../../api/movies/search-movies";
+import { getTmdbPosterUrl } from "../../utils/tmdb-image";
+
+interface SearchPageProps {
+  /** app/search/page.tsx에서 ?query 값을 읽어 넘겨준다. */
+  query?: string;
+}
+
+export function SearchPage({ query }: SearchPageProps) {
+  const router = useRouter();
+  const [searchText, setSearchText] = useState(query ?? "");
+
+  const normalizedQuery = query?.trim() ?? "";
+
+  const searchQuery = useQuery({
+    queryKey: ["movies", "search", { query: normalizedQuery }],
+    queryFn: () => searchMovies({ query: normalizedQuery }),
+    enabled: normalizedQuery.length > 0,
+  });
+
+  const movies = searchQuery.data?.results ?? [];
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextQuery = searchText.trim();
+    router.push(
+      nextQuery ? `/search?${new URLSearchParams({ query: nextQuery })}` : "/search",
+    );
+  }
+
+  return (
+    <main className="min-h-[calc(100vh-4rem)] bg-slate-50 px-5 py-16 sm:px-8">
+      <div className="mx-auto max-w-5xl">
+        <section className="mx-auto max-w-xl text-center">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+            어떤 영화를 찾고 있나요?
+          </h1>
+          <form
+            onSubmit={handleSubmit}
+            className="mt-6 flex overflow-hidden rounded-md border border-slate-300 bg-white shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100"
+          >
+            <input
+              aria-label="검색어"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="영화 제목을 입력해 주세요"
+              className="min-w-0 flex-1 px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400"
+            />
+            <button
+              type="submit"
+              aria-label="검색"
+              className="flex w-12 items-center justify-center bg-slate-950 transition-colors hover:bg-slate-800"
+            >
+              <Image
+                src="/icons/search.svg"
+                alt=""
+                width={16}
+                height={16}
+                className="size-4 brightness-0 invert"
+              />
+            </button>
+          </form>
+        </section>
+
+        {normalizedQuery && (
+          <section className="mt-16">
+            <div className="mb-5 flex items-end justify-between border-b border-slate-200 pb-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-950">
+                  영화 검색 결과
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  '{normalizedQuery}'에 대한 영화 {movies.length}편
+                </p>
+              </div>
+            </div>
+
+            {searchQuery.isLoading && (
+              <p className="py-16 text-center text-sm text-slate-500">
+                검색 결과를 불러오는 중이에요.
+              </p>
+            )}
+
+            {searchQuery.isError && (
+              <div className="py-16 text-center" role="alert">
+                <p className="text-sm text-red-500">
+                  {searchQuery.error.message || "검색 결과를 불러오지 못했어요."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => searchQuery.refetch()}
+                  className="mt-4 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                  다시 시도
+                </button>
+              </div>
+            )}
+
+            {!searchQuery.isLoading &&
+              !searchQuery.isError &&
+              movies.length === 0 && (
+                <p className="py-16 text-center text-sm text-slate-500">
+                  검색 결과가 없어요.
+                </p>
+              )}
+
+            {!searchQuery.isLoading &&
+              !searchQuery.isError &&
+              movies.length > 0 && (
+                <ul className="grid gap-5 sm:grid-cols-2">
+                  {movies.map((movie) => (
+                    <li
+                      key={movie.id}
+                      className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200"
+                    >
+                      <Link
+                        href={`/movies/${movie.id}`}
+                        className="flex h-full gap-4 p-4 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                      >
+                        <Image
+                          src={
+                            getTmdbPosterUrl(movie.poster_path) ??
+                            "/images/movie-placeholder.svg"
+                          }
+                          alt={`${movie.title} 포스터`}
+                          width={88}
+                          height={128}
+                          sizes="88px"
+                          className="h-32 w-[5.5rem] shrink-0 rounded object-cover"
+                        />
+                        <div className="min-w-0 text-left">
+                          <h3 className="truncate font-bold text-slate-900">
+                            {movie.title}
+                          </h3>
+                          <p className="mt-1 truncate text-sm text-slate-500">
+                            {movie.original_title}
+                          </p>
+                          <p className="mt-3 text-xs text-slate-500">
+                            {movie.release_date}
+                          </p>
+                          <p className="mt-2 line-clamp-2 text-sm leading-5 text-slate-600">
+                            {movie.overview}
+                          </p>
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+          </section>
+        )}
+      </div>
+    </main>
+  );
+}
